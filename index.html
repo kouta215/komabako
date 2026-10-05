@@ -606,7 +606,16 @@ $('authForm').addEventListener('submit', async e => {
       if(password.length < 8) return aStatus('パスワードは8文字以上にしてください。', true);
       if(!$('aAgreeBox').checked) return aStatus('利用規約への同意が必要です。', true);
       const r = await sb.auth.signUp({email, password, options: {data: {pen_name: pen}, emailRedirectTo: back}});
-      if(r.error) return aStatus('登録できませんでした。すでに登録済みのメールアドレスかもしれません。', true);
+      if(r.error){
+        const m = String(r.error.message || '');
+        return aStatus((/already|registered|exists/i.test(m) ? 'このメールアドレスはすでに登録されています。ログインしてください。'
+          : /rate limit|too many|seconds/i.test(m) ? '確認メールの送信上限に達しました。しばらく待ってから試してください。'
+          : /invalid/i.test(m) ? 'このメールアドレスは使えません。ふだん使っている実在のアドレスで試してください。'
+          : /password/i.test(m) ? 'このパスワードは使えません。もっと長く、推測されにくいものにしてください。'
+          : /signups? (not allowed|disabled)/i.test(m) ? '現在、新規登録を受け付けていません。'
+          : /database error/i.test(m) ? 'サーバー側の設定に問題があり、登録できませんでした。'
+          : '登録できませんでした。') + '（' + m + '）', true);
+      }
       if(r.data.session) $('authSheet').hidden = true;
       else aStatus('確認メールを送りました。メール内のリンクを開くと登録が完了します。');
     } else if(authMode === 'reset'){
