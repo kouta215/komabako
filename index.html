@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>コマバコ｜だれでも投稿できる縦読み漫画</title>
+<meta name="description" content="だれでも漫画を投稿して、縦スクロールでそのまま読めるサイト。いいね、本棚、ランキングつき。">
+<meta property="og:title" content="コマバコ">
+<meta property="og:description" content="だれでも漫画を投稿して、縦スクロールでそのまま読めるサイト。">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 漫画雑誌の目次のような表紙グリッド＋縦スクロールで読む全画面リーダー */
+:root{
+  --paper:#f5f6f8; --card:#ffffff; --ink:#16171c; --muted:#5b5f6d; --line:#dcdfe6;
+  --tone:#c3c7d1; --accent:#2346d6; --accent-ink:#ffffff; --alert:#c42c2c; --alert-soft:#fde9e9;
+  --reader:#0d0d10; --reader-fg:#f1f1f4;
+  --display:"Dela Gothic One","Hiragino Sans","Noto Sans JP",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+  --r:6px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#111217; --card:#1a1c23; --ink:#eceef3; --muted:#9aa0ae; --line:#2b2e38;
+  --tone:#343845; --accent:#7f97ff; --accent-ink:#0d0f17; --alert:#ff7676; --alert-soft:#3a1d20; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#111217; --card:#1a1c23; --ink:#eceef3; --muted:#9aa0ae; --line:#2b2e38;
+  --tone:#343845; --accent:#7f97ff; --accent-ink:#0d0f17; --alert:#ff7676; --alert-soft:#3a1d20; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:0 64px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* ヘッダー：網点トーンの帯 */
+.mast{position:relative;padding-block:28px 22px;border-bottom:3px solid var(--ink);display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.mast::before{content:"";position:absolute;inset:0 -16px auto auto;width:min(46%,360px);height:100%;
+  background-image:radial-gradient(var(--tone) 1.6px,transparent 1.8px);background-size:9px 9px;
+  -webkit-mask-image:linear-gradient(to left,#000 10%,transparent);mask-image:linear-gradient(to left,#000 10%,transparent);pointer-events:none}
+.logo{position:relative;margin:0;font-family:var(--display);font-weight:400;font-size:clamp(34px,7vw,52px);line-height:1;letter-spacing:.02em}
+.tag{position:relative;margin:8px 0 0;color:var(--muted);font-size:14px}
+.tag b{display:inline-block;margin-right:8px;padding:1px 8px;border:1.5px solid var(--ink);border-radius:999px;font-size:11px;letter-spacing:.08em;color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:var(--r);border:2px solid var(--ink);background:var(--card);font-weight:700}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{border-color:var(--alert);color:var(--alert);background:transparent}
+.btn:disabled{opacity:.5;cursor:default}
+.mast .btn{position:relative}
+
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;margin:22px 0 14px}
+.bar h2{margin:0;font-size:17px;font-weight:700}
+.count{color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+.notice{margin:16px 0 0;padding:10px 14px;border:1px dashed var(--line);border-radius:var(--r);color:var(--muted);font-size:13px}
+
+/* 作品グリッド */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:24px 18px}
+.work{display:flex;flex-direction:column;gap:8px;min-width:0;text-align:left;padding:0;border:0;background:none}
+.cover{position:relative;width:100%;max-width:100%;aspect-ratio:1/1.414;background:var(--card);border:2px solid var(--ink);overflow:hidden}
+.cover img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .25s}
+.work:hover .cover img{transform:scale(1.03)}
+.pages{position:absolute;right:6px;bottom:6px;background:var(--ink);color:var(--paper);font-size:11px;padding:1px 7px;border-radius:999px;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:22px 0 0}
+.tab{padding:6px 14px;border:1.5px solid var(--line);border-radius:999px;background:transparent;font-size:13px;font-weight:700;color:var(--muted)}
+.tab[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.rank{position:absolute;left:0;top:0;background:var(--ink);color:var(--paper);font-family:var(--display);font-size:16px;min-width:32px;text-align:center;padding:2px 6px}
+.rank.top{background:var(--accent);color:var(--accent-ink)}
+.stats{margin:0;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stats b{color:var(--ink)}
+.shelfbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--r);font-size:13px}
+.shelfbar input{flex:1 1 180px;min-width:0;padding:8px 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--card)}
+.shelfbar .btn{padding:7px 14px;font-size:13px}
+.shelfbar .msg{flex:1 1 100%;color:var(--muted);overflow-wrap:anywhere;user-select:all}
+.rbtn.on{background:#7f97ff;border-color:#7f97ff;color:#0d0f17;font-weight:700}
+.flag{position:absolute;right:6px;top:6px;background:var(--alert);color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px}
+.wt{margin:0;font-weight:700;font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+.wa{margin:0;color:var(--muted);font-size:12.5px}
+
+.empty{grid-column:1/-1;display:grid;place-items:center;text-align:center;padding:56px 16px;border:2px dashed var(--line);border-radius:var(--r);color:var(--muted)}
+.empty strong{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+.skel .cover{border-color:var(--line);background-image:radial-gradient(var(--tone) 1.3px,transparent 1.5px);background-size:8px 8px}
+
+/* 投稿パネル */
+.sheet{position:fixed;inset:0;z-index:20;background:rgb(0 0 0 / .45);display:grid;place-items:center;padding:16px}
+.panel{width:min(560px,100%);max-height:calc(100% - 32px);overflow:auto;background:var(--card);border:2px solid var(--ink);border-radius:var(--r);padding:22px 20px}
+.panel h3{margin:0 0 4px;font-family:var(--display);font-weight:400;font-size:22px}
+.panel .sub{margin:0 0 16px;color:var(--muted);font-size:13px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.field label{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.field input[type=text],.field textarea,.field select{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--paper)}
+.field textarea{min-height:72px;resize:vertical}
+.drop{display:grid;place-items:center;gap:4px;padding:22px 12px;border:2px dashed var(--line);border-radius:var(--r);text-align:center;color:var(--muted);font-size:13px;cursor:pointer}
+.drop.on{border-color:var(--accent);color:var(--ink)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-top:10px}
+.thumbs figure{margin:0;position:relative}
+.thumbs img{width:100%;aspect-ratio:1/1.414;object-fit:cover;border:1px solid var(--line);display:block}
+.thumbs figcaption{position:absolute;left:3px;top:3px;background:var(--ink);color:var(--paper);font-size:10px;padding:0 5px;border-radius:3px;font-variant-numeric:tabular-nums}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:6px 0 16px}
+.check input{margin-top:5px}
+.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;align-items:center}
+.status{flex:1 1 180px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.status.err{color:var(--alert)}
+
+/* リーダー（常に暗い画面で読む） */
+.reader{position:fixed;inset:0;z-index:30;background:var(--reader);color:var(--reader-fg);display:flex;flex-direction:column}
+.rtop{display:flex;gap:12px;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;border-bottom:1px solid #26262c}
+.rtop .t{flex:1;min-width:0}
+.rtop .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtop .t span{font-size:12px;color:#a3a3ad}
+.rbtn{background:transparent;border:1.5px solid #4a4a55;color:var(--reader-fg);border-radius:var(--r);padding:6px 12px;font-size:13px}
+.rbtn.warn{border-color:#ff7676;color:#ff9a9a}
+.stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.strip{max-width:720px;margin:0 auto}
+.strip img{display:block;width:100%;height:auto;min-height:200px;background:#1b1b20;user-select:none}
+.desc{max-width:640px;margin:0 auto;padding:16px 16px 20px;font-size:13px;color:#c4c4cc;text-align:center;overflow-wrap:anywhere}
+.fin{padding:36px 16px 48px;text-align:center;color:#a3a3ad;font-size:13px}
+.fin b{display:block;font-family:var(--display);font-weight:400;font-size:22px;color:var(--reader-fg);letter-spacing:.2em;margin-bottom:6px}
+.prog{height:3px;background:#26262c}
+.prog i{display:block;height:100%;width:0;background:#7f97ff;transition:width .15s}
+.rbot{display:flex;gap:12px;align-items:center;justify-content:center;padding:8px 16px calc(10px + env(safe-area-inset-bottom,0px));font-variant-numeric:tabular-nums}
+.rbot .pg{min-width:80px;text-align:center;font-size:13px;color:#c4c4cc}
+.report{position:absolute;right:16px;top:calc(56px + env(safe-area-inset-top,0px));width:min(300px,calc(100% - 32px));background:#1d1d23;border:1px solid #3a3a44;border-radius:var(--r);padding:14px;z-index:2}
+.report p{margin:0 0 8px;font-size:13px}
+.report select{width:100%;padding:7px;border-radius:var(--r);background:#111;border:1px solid #3a3a44;color:var(--reader-fg);margin-bottom:10px}
+.confirm{background:var(--alert-soft);color:var(--ink);border:1.5px solid var(--alert);border-radius:var(--r);padding:12px;font-size:13px}
+
+.foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+a{color:var(--accent)}
+.acts{position:relative;display:flex;flex-wrap:wrap;gap:8px}
+.acts .btn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.links{display:flex;flex-wrap:wrap;gap:6px 18px;margin:14px 0 0}
+.link{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font-size:13px}
+.field input[type=email],.field input[type=password]{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--paper)}
+.rbot{flex-wrap:wrap}
+.rtop{flex-wrap:wrap}
+.rtop .t{flex:1 1 140px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <h1 class="logo">コマバコ</h1>
+      <p class="tag">だれでも漫画を投稿して、縦スクロールでそのまま読める場所</p>
+    </div>
+    <div class="acts">
+      <button class="btn" id="acctBtn">ログイン</button>
+      <button class="btn primary" id="openPost">＋ 漫画を投稿</button>
+    </div>
+  </header>
+
+  <p class="notice" id="notice" hidden></p>
+
+  <nav class="tabs" id="tabs" aria-label="表示の切り替え">
+    <button class="tab" data-v="new" aria-pressed="true">新着</button>
+    <button class="tab" data-v="likes" aria-pressed="false">いいね順</button>
+    <button class="tab" data-v="shelf" aria-pressed="false">ブックマーク順</button>
+    <button class="tab" data-v="views" aria-pressed="false">閲覧数順</button>
+    <button class="tab" data-v="mine" aria-pressed="false">わたしの本棚</button>
+    <button class="tab" data-v="reports" aria-pressed="false" id="tabReports" hidden>通報</button>
+  </nav>
+
+  <div class="bar">
+    <h2 id="viewTitle">新着の作品</h2>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="shelfbar" id="shelfBar" hidden>
+    <input type="text" id="shelfName" maxlength="30" placeholder="本棚の名前（例：みなとの推し棚）" aria-label="本棚の名前">
+    <button class="btn" id="shelfShare">本棚をシェア</button>
+    <span class="msg" id="shelfMsg" hidden></span>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="work skel" aria-hidden="true"><div class="cover"></div></div>
+    <div class="work skel" aria-hidden="true"><div class="cover"></div></div>
+    <div class="work skel" aria-hidden="true"><div class="cover"></div></div>
+  </div>
+
+  <p class="foot">投稿された作品の権利は作者に帰属します。無断転載・成人向け表現・他者を傷つける内容は削除の対象です。気になる作品は読む画面の「通報」から知らせてください。<br>
+  <a href="terms.html">利用規約</a>　<a href="privacy.html">プライバシーポリシー</a></p>
+</div>
+
+<!-- ログイン・登録 -->
+<div class="sheet" id="authSheet" hidden>
+  <form class="panel" id="authForm" novalidate>
+    <h3 id="aTitle">ログイン</h3>
+    <p class="sub" id="aSub">投稿・いいね・本棚は、登録すると使えます。読むだけなら登録は不要です。</p>
+    <div class="field" id="aPenF"><label for="aPen">ペンネーム</label><input type="text" id="aPen" maxlength="30" autocomplete="nickname"></div>
+    <div class="field" id="aEmailF"><label for="aEmail">メールアドレス</label><input type="email" id="aEmail" autocomplete="email"></div>
+    <div class="field" id="aPassF"><label for="aPass">パスワード（8文字以上）</label><input type="password" id="aPass" autocomplete="current-password"></div>
+    <label class="check" id="aAgree"><input type="checkbox" id="aAgreeBox"><span><a href="terms.html" target="_blank">利用規約</a>と<a href="privacy.html" target="_blank">プライバシーポリシー</a>に同意します</span></label>
+    <div class="row">
+      <span class="status" id="aStatus" role="status"></span>
+      <button type="button" class="btn" id="aCancel">閉じる</button>
+      <button type="submit" class="btn primary" id="aSubmit">ログイン</button>
+    </div>
+    <p class="links"><button type="button" class="link" id="aSwitch">はじめての方は新規登録</button><button type="button" class="link" id="aForgot">パスワードを忘れた</button></p>
+  </form>
+</div>
+
+<!-- アカウント -->
+<div class="sheet" id="acctSheet" hidden>
+  <form class="panel" id="acctForm" novalidate>
+    <h3>アカウント</h3>
+    <p class="sub" id="acctMail"></p>
+    <div class="field"><label for="acctPen">ペンネーム</label><input type="text" id="acctPen" maxlength="30"></div>
+    <div class="row">
+      <span class="status" id="acctStatus" role="status"></span>
+      <button type="button" class="btn danger" id="acctOut">ログアウト</button>
+      <button type="button" class="btn" id="acctClose">閉じる</button>
+      <button type="submit" class="btn primary">保存</button>
+    </div>
+  </form>
+</div>
+
+<!-- 投稿パネル -->
+<div class="sheet" id="postSheet" hidden>
+  <form class="panel" id="postForm" novalidate>
+    <h3>漫画を投稿</h3>
+    <p class="sub">画像はファイル名の順（01.jpg, 02.jpg…）に上から縦につながります。1枚目が表紙になります。縦長の画像もそのまま使えます。</p>
+    <div class="field"><label for="fTitle">タイトル</label><input type="text" id="fTitle" maxlength="60" required placeholder="例：放課後ロケット部"></div>
+    <div class="field"><label for="fAuthor">ペンネーム</label><input type="text" id="fAuthor" maxlength="30" required placeholder="例：みなと"></div>
+    <div class="field"><label for="fDesc">ひとこと紹介（任意）</label><textarea id="fDesc" maxlength="200" placeholder="どんな話か一行で"></textarea></div>
+    <div class="field">
+      <label for="fFiles">ページ画像（最大60枚）</label>
+      <label class="drop" id="drop" for="fFiles">クリックして画像を選ぶ<br>またはここにドラッグ</label>
+      <input type="file" id="fFiles" accept="image/png,image/jpeg,image/webp" multiple hidden>
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+    <label class="check"><input type="checkbox" id="fRights"><span>この作品は自分で描いたもので、他人の作品の転載ではありません。成人向けの内容も含みません</span></label>
+    <div class="row">
+      <span class="status" id="pStatus" role="status"></span>
+      <button type="button" class="btn" id="cancelPost">やめる</button>
+      <button type="submit" class="btn primary" id="submitPost">投稿する</button>
+    </div>
+  </form>
+</div>
+
+<!-- リーダー -->
+<div class="reader" id="reader" hidden>
+  <div class="rtop">
+    <div class="t"><b id="rTitle"></b><span id="rAuthor"></span></div>
+    <button class="rbtn warn" id="rReport">通報</button>
+    <button class="rbtn" id="rDelete" hidden>削除</button>
+    <button class="rbtn" id="rClose">閉じる</button>
+  </div>
+  <div class="report" id="reportBox" hidden>
+    <p>この作品を運営に知らせます。理由を選んでください。</p>
+    <select id="rReason">
+      <option value="無断転載">他人の作品の無断転載</option>
+      <option value="成人向け">成人向け・過激な表現</option>
+      <option value="誹謗中傷">誹謗中傷・差別</option>
+      <option value="その他">その他</option>
+    </select>
+    <div class="row"><button class="rbtn" id="rReportCancel">やめる</button><button class="rbtn warn" id="rReportSend">送信</button></div>
+  </div>
+  <div class="report" id="deleteBox" hidden>
+    <p id="delMsg">この作品と全ページの画像を削除します。元に戻せません。</p>
+    <div class="row"><button class="rbtn" id="rDelCancel">やめる</button><button class="rbtn warn" id="rDelOk">削除する</button></div>
+  </div>
+  <div class="stage" id="stage">
+    <p class="desc" id="rDesc"></p>
+    <p class="desc" id="rReports" hidden></p>
+    <div class="strip" id="strip"></div>
+    <div class="fin"><b>おわり</b><span id="rFin"></span></div>
+  </div>
+  <div class="prog"><i id="rBar"></i></div>
+  <div class="rbot">
+    <button class="rbtn" id="rLike" aria-pressed="false" aria-label="いいね">♥ 0</button>
+    <button class="rbtn" id="rShelf" aria-pressed="false">＋ 本棚</button>
+    <button class="rbtn" id="rShare">シェア</button>
+    <span class="pg" id="rPg"></span>
+    <button class="rbtn" id="rTop">先頭へ</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const cfg = window.KOMABAKO || {};
+const cfgOk = typeof cfg.url === 'string' && cfg.url.startsWith('https://') && typeof cfg.key === 'string' && cfg.key.length > 20 && window.supabase;
+const sb = cfgOk ? supabase.createClient(cfg.url, cfg.key) : null;
+
+let me = null, profile = null, works = [], myLikes = new Set(), myShelf = [], shared = null, reports = {};
+let view = 'new', current = null, page = 0, picked = [], pageObs = null, authMode = 'in', noticeTimer = null;
+const TITLES = {new:'新着の作品', likes:'いいね数ランキング', shelf:'ブックマーク数ランキング', views:'閲覧数ランキング', mine:'わたしの本棚', shared:'シェアされた本棚', reports:'通報された作品'};
+
+function notice(msg, keep){
+  $('notice').textContent = msg; $('notice').hidden = false;
+  clearTimeout(noticeTimer); if(!keep) noticeTimer = setTimeout(() => { $('notice').hidden = true; }, 6000);
+}
+const imgUrl = p => sb.storage.from('pages').getPublicUrl(p).data.publicUrl;
+const fmtDate = s => new Date(s).toLocaleDateString('ja-JP', {year:'numeric', month:'short', day:'numeric'});
+const isAdmin = () => !!(profile && profile.is_admin);
+async function copyText(text, okMsg){
+  try{ await navigator.clipboard.writeText(text); return okMsg; }catch(e){ return text; }
+}
+
+/* ---------- データの読み込み ---------- */
+async function loadWorks(){
+  const {data, error} = await sb.from('work_list').select('*').order('created_at', {ascending:false}).limit(500);
+  if(error){ works = []; notice('作品を読み込めませんでした。時間をおいて開き直してください。', true); }
+  else works = data || [];
+  render();
+}
+async function loadMine(){
+  myLikes = new Set(); myShelf = []; profile = null; reports = {};
+  if(me){
+    const [l, b, p] = await Promise.all([
+      sb.from('likes').select('work_id').eq('user_id', me.id),
+      sb.from('bookmarks').select('work_id').eq('user_id', me.id).order('created_at', {ascending:false}),
+      sb.from('profiles').select('pen_name,shelf_name,is_admin').eq('id', me.id).maybeSingle()
+    ]);
+    (l.data || []).forEach(r => myLikes.add(r.work_id));
+    myShelf = (b.data || []).map(r => r.work_id);
+    profile = p.data || null;
+    if(isAdmin()){
+      const r = await sb.from('reports').select('work_id,reason');
+      (r.data || []).forEach(x => { (reports[x.work_id] = reports[x.work_id] || []).push(x.reason); });
+    }
+  }
+  $('acctBtn').textContent = me ? ((profile && profile.pen_name) || 'アカウント') : 'ログイン';
+  $('tabReports').hidden = !isAdmin();
+  if(!isAdmin() && view === 'reports') view = 'new';
+  render(); syncReaderBtns();
+}
+
+/* ---------- 一覧 ---------- */
+function setView(v){
+  view = v;
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-pressed', t.dataset.v === v));
+  render();
+}
+$('tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if(t) setView(t.dataset.v); });
+
+function currentList(){
+  const byNew = (a, b) => new Date(b.created_at) - new Date(a.created_at);
+  const key = {likes:'like_count', shelf:'shelf_count', views:'view_count'}[view];
+  if(key) return [...works].sort((a, b) => b[key] - a[key] || byNew(a, b));
+  if(view === 'mine' || view === 'shared'){
+    const ids = view === 'mine' ? myShelf : (shared ? shared.ids : []);
+    return ids.map(id => works.find(w => w.id === id)).filter(Boolean);
+  }
+  if(view === 'reports') return works.filter(w => reports[w.id]).sort((a, b) => reports[b.id].length - reports[a.id].length);
+  return works;
+}
+function render(){
+  const g = $('grid'); g.textContent = '';
+  const list = currentList(), ranked = view === 'likes' || view === 'shelf' || view === 'views';
+  let title = TITLES[view];
+  if(view === 'shared' && shared && shared.name) title = shared.name;
+  if(view === 'mine' && profile && profile.shelf_name) title = profile.shelf_name;
+  $('viewTitle').textContent = title;
+  $('shelfBar').hidden = !(view === 'mine' && me);
+  if(document.activeElement !== $('shelfName')) $('shelfName').value = (profile && profile.shelf_name) || '';
+  $('count').textContent = list.length ? list.length + ' 作品' : '';
+  if(!list.length){
+    const e = document.createElement('div'); e.className = 'empty';
+    const s = document.createElement('strong'), p = document.createElement('span');
+    if(view === 'mine'){ s.textContent = '本棚はまだ空です'; p.textContent = me ? '作品を開いて「＋ 本棚」を押すと、ここに並びます。' : '本棚はログインすると使えます。'; }
+    else if(view === 'shared'){ s.textContent = 'この本棚には作品がありません'; p.textContent = '持ち主がまだ何も入れていないか、作品が削除されました。'; }
+    else if(view === 'reports'){ s.textContent = '通報はありません'; p.textContent = '通報された作品があると、ここに並びます。'; }
+    else { s.textContent = 'まだ作品がありません'; p.textContent = '右上の「漫画を投稿」から、最初の一作を載せてみましょう。'; }
+    e.append(s, p); g.append(e); return;
+  }
+  for(const [i, w] of list.entries()){
+    const b = document.createElement('button'); b.className = 'work'; b.type = 'button';
+    const c = document.createElement('div'); c.className = 'cover';
+    const img = document.createElement('img'); img.loading = 'lazy'; img.alt = w.title + ' の表紙'; img.src = imgUrl(w.pages[0]);
+    const pg = document.createElement('span'); pg.className = 'pages'; pg.textContent = w.pages.length + 'P';
+    c.append(img, pg);
+    if(ranked){ const r = document.createElement('span'); r.className = 'rank' + (i < 3 ? ' top' : ''); r.textContent = i + 1; c.append(r); }
+    if(reports[w.id]){ const f = document.createElement('span'); f.className = 'flag'; f.textContent = '通報 ' + reports[w.id].length; c.append(f); }
+    const t = document.createElement('p'); t.className = 'wt'; t.textContent = w.title;
+    const a = document.createElement('p'); a.className = 'wa'; a.textContent = w.author + '・' + fmtDate(w.created_at);
+    const st = document.createElement('p'); st.className = 'stats';
+    [['♥', 'like_count', 'likes'], ['本棚', 'shelf_count', 'shelf'], ['閲覧', 'view_count', 'views']].forEach(([label, k, v]) => {
+      const sp = document.createElement(view === v ? 'b' : 'span'); sp.textContent = label + ' ' + (w[k] || 0); st.append(sp);
+    });
+    b.append(c, t, a, st);
+    b.addEventListener('click', () => openReader(w));
+    g.append(b);
+  }
+}
+
+/* ---------- 本棚 ---------- */
+$('shelfName').addEventListener('change', async () => {
+  if(!me) return;
+  const name = $('shelfName').value.trim();
+  const r = await sb.from('profiles').update({shelf_name: name}).eq('id', me.id);
+  if(r.error) notice('本棚の名前を保存できませんでした。'); else { if(profile) profile.shelf_name = name; render(); }
+});
+$('shelfShare').onclick = async () => {
+  const m = $('shelfMsg'); m.hidden = false;
+  m.textContent = await copyText(location.origin + location.pathname + '#shelf-' + me.id, 'リンクをコピーしました。SNSなどに貼ると、あなたの本棚が開きます。');
+};
+
+/* ---------- 読む画面（縦スクロール） ---------- */
+function deviceId(){
+  let id = null;
+  try{ id = localStorage.getItem('kb_device'); if(!id){ id = crypto.randomUUID(); localStorage.setItem('kb_device', id); } }catch(e){}
+  return id || crypto.randomUUID();
+}
+function countView(w){
+  const key = (me ? me.id : 'd') + ':' + w.id; let seen = [];
+  try{ seen = JSON.parse(localStorage.getItem('kb_seen') || '[]'); }catch(e){}
+  if(seen.includes(key)) return;
+  seen.push(key); try{ localStorage.setItem('kb_seen', JSON.stringify(seen.slice(-2000))); }catch(e){}
+  sb.from('views').insert({work_id: w.id, viewer: me ? me.id : deviceId()}).then(r => { if(!r.error){ w.view_count = (w.view_count || 0) + 1; render(); } });
+}
+function openReader(w){
+  current = w; page = 0;
+  $('rTitle').textContent = w.title; $('rAuthor').textContent = w.author + '・' + w.pages.length + 'ページ';
+  $('rDesc').textContent = w.description || ''; $('rDesc').hidden = !w.description;
+  $('rReports').hidden = !reports[w.id];
+  if(reports[w.id]) $('rReports').textContent = '通報 ' + reports[w.id].length + '件：' + [...new Set(reports[w.id])].join('、');
+  $('rFin').textContent = w.author + '「' + w.title + '」';
+  $('rDelete').hidden = !(me && (w.user_id === me.id || isAdmin()));
+  $('reportBox').hidden = true; $('deleteBox').hidden = true; $('rReport').textContent = '通報'; $('rShare').textContent = 'シェア';
+  const strip = $('strip'); strip.textContent = '';
+  if(pageObs) pageObs.disconnect();
+  pageObs = new IntersectionObserver(es => {
+    es.forEach(e => { if(e.isIntersecting){ page = +e.target.dataset.i; updateProgress(); } });
+  }, {root: $('stage'), rootMargin: '-45% 0px -45% 0px'});
+  w.pages.forEach((p, i) => {
+    const im = document.createElement('img');
+    im.src = imgUrl(p); im.alt = w.title + ' ' + (i + 1) + 'ページ'; im.dataset.i = i;
+    if(i > 2) im.loading = 'lazy';
+    strip.append(im); pageObs.observe(im);
+  });
+  countView(w); syncReaderBtns();
+  document.body.style.overflow = 'hidden';
+  $('reader').hidden = false; $('stage').scrollTop = 0; updateProgress(); $('rClose').focus();
+}
+function updateProgress(){
+  if(!current) return;
+  const st = $('stage'), max = st.scrollHeight - st.clientHeight;
+  $('rBar').style.width = (max > 0 ? Math.min(100, st.scrollTop / max * 100) : 0) + '%';
+  $('rPg').textContent = (page + 1) + ' / ' + current.pages.length + ' ページ';
+}
+function closeReader(){
+  $('reader').hidden = true; current = null; document.body.style.overflow = '';
+  if(pageObs) pageObs.disconnect();
+  if(/^#work-/.test(location.hash)) history.replaceState(null, '', location.pathname);
+}
+function syncReaderBtns(){
+  if(!current) return;
+  const liked = myLikes.has(current.id), kept = myShelf.includes(current.id);
+  $('rLike').textContent = '♥ ' + (current.like_count || 0); $('rLike').classList.toggle('on', liked); $('rLike').setAttribute('aria-pressed', liked);
+  $('rShelf').textContent = kept ? '✓ 本棚' : '＋ 本棚'; $('rShelf').classList.toggle('on', kept); $('rShelf').setAttribute('aria-pressed', kept);
+}
+$('stage').addEventListener('scroll', updateProgress, {passive: true});
+$('rTop').onclick = () => $('stage').scrollTo({top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+$('rClose').onclick = closeReader;
+document.addEventListener('keydown', e => { if(!$('reader').hidden && e.key === 'Escape') closeReader(); });
+
+async function toggle(table, w, has, add, remove, countKey){
+  if(!me) return openAuth('in');
+  const on = has();
+  if(on){ remove(); w[countKey] = Math.max(0, (w[countKey] || 0) - 1); } else { add(); w[countKey] = (w[countKey] || 0) + 1; }
+  render(); syncReaderBtns();
+  const r = on ? await sb.from(table).delete().eq('user_id', me.id).eq('work_id', w.id)
+               : await sb.from(table).insert({user_id: me.id, work_id: w.id});
+  if(r.error && r.error.code !== '23505'){ notice('保存できませんでした。もう一度試してください。'); await loadWorks(); await loadMine(); }
+}
+$('rLike').onclick = () => current && toggle('likes', current, () => myLikes.has(current.id), () => myLikes.add(current.id), () => myLikes.delete(current.id), 'like_count');
+$('rShelf').onclick = () => { const w = current; if(w) toggle('bookmarks', w, () => myShelf.includes(w.id), () => myShelf.unshift(w.id), () => { myShelf = myShelf.filter(id => id !== w.id); }, 'shelf_count'); };
+$('rShare').onclick = async () => {
+  if(!current) return;
+  const link = location.origin + location.pathname + '#work-' + current.id;
+  const res = await copyText(link, 'コピーしました');
+  if(res === link) notice(link, true); else $('rShare').textContent = res;
+};
+
+$('rReport').onclick = () => { $('deleteBox').hidden = true; $('reportBox').hidden = !$('reportBox').hidden; };
+$('rReportCancel').onclick = () => { $('reportBox').hidden = true; };
+$('rReportSend').onclick = async () => {
+  if(!current) return;
+  $('rReportSend').disabled = true;
+  const r = await sb.from('reports').insert({work_id: current.id, reason: $('rReason').value, user_id: me ? me.id : null});
+  $('reportBox').hidden = true; $('rReport').textContent = r.error ? '通報できませんでした' : '通報しました';
+  $('rReportSend').disabled = false;
+};
+$('rDelete').onclick = () => { $('reportBox').hidden = true; $('delMsg').textContent = 'この作品と全ページの画像を削除します。元に戻せません。'; $('deleteBox').hidden = !$('deleteBox').hidden; };
+$('rDelCancel').onclick = () => { $('deleteBox').hidden = true; };
+$('rDelOk').onclick = async () => {
+  const w = current; if(!w) return;
+  $('rDelOk').disabled = true;
+  const r = await sb.from('works').delete().eq('id', w.id);
+  if(r.error){ $('delMsg').textContent = '削除できませんでした。時間をおいてもう一度試してください。'; }
+  else {
+    await sb.storage.from('pages').remove(w.pages);
+    works = works.filter(x => x.id !== w.id); delete reports[w.id]; myShelf = myShelf.filter(id => id !== w.id);
+    closeReader(); render();
+  }
+  $('rDelOk').disabled = false;
+};
+
+/* ---------- 投稿 ---------- */
+function setStatus(msg, err){ $('pStatus').textContent = msg; $('pStatus').classList.toggle('err', !!err); }
+function pick(files){
+  picked = [...files].filter(f => /^image\/(png|jpeg|webp)$/.test(f.type))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ja', {numeric: true})).slice(0, 60);
+  const t = $('thumbs'); t.textContent = '';
+  picked.forEach((f, i) => {
+    const fig = document.createElement('figure'), im = document.createElement('img');
+    im.src = URL.createObjectURL(f); im.alt = '';
+    const cap = document.createElement('figcaption'); cap.textContent = i === 0 ? '表紙' : (i + 1);
+    fig.append(im, cap); t.append(fig);
+  });
+  setStatus(picked.length ? picked.length + 'ページ選択中' : '');
+}
+$('fFiles').onchange = e => pick(e.target.files);
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('on'); }));
+drop.addEventListener('drop', e => pick(e.dataTransfer.files));
+
+async function shrink(file){
+  const bmp = await createImageBitmap(file);
+  const s = Math.min(1, 1080 / bmp.width, 16000 / bmp.height);
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.82));
+  if(!blob) throw new Error('encode');
+  return blob;
+}
+$('openPost').onclick = () => {
+  if(!sb) return;
+  if(!me) return openAuth('in');
+  if(!$('fAuthor').value && profile) $('fAuthor').value = profile.pen_name || '';
+  $('postSheet').hidden = false; $('fTitle').focus();
+};
+$('cancelPost').onclick = () => { $('postSheet').hidden = true; };
+$('postForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const title = $('fTitle').value.trim(), author = $('fAuthor').value.trim(), description = $('fDesc').value.trim();
+  if(!me) return setStatus('ログインしてください', true);
+  if(!title) return setStatus('タイトルを入れてください', true);
+  if(!author) return setStatus('ペンネームを入れてください', true);
+  if(!picked.length) return setStatus('ページ画像を1枚以上選んでください', true);
+  if(!$('fRights').checked) return setStatus('確認のチェックを入れてください', true);
+  $('submitPost').disabled = true; $('cancelPost').disabled = true;
+  const id = crypto.randomUUID(), paths = [];
+  try{
+    for(let i = 0; i < picked.length; i++){
+      setStatus('アップロード中 ' + (i + 1) + ' / ' + picked.length);
+      const blob = await shrink(picked[i]);
+      const path = me.id + '/' + id + '/' + String(i + 1).padStart(3, '0') + '.jpg';
+      const up = await sb.storage.from('pages').upload(path, blob, {contentType: 'image/jpeg', cacheControl: '31536000'});
+      if(up.error) throw up.error;
+      paths.push(path);
+    }
+    setStatus('保存しています…');
+    const ins = await sb.from('works').insert({id, user_id: me.id, title, author, description, pages: paths});
+    if(ins.error) throw ins.error;
+    $('postForm').reset(); pick([]); $('postSheet').hidden = true; setStatus('');
+    setView('new'); await loadWorks();
+  }catch(err){
+    if(paths.length) await sb.storage.from('pages').remove(paths);
+    const m = String((err && err.message) || '');
+    setStatus(/size|large|exceed/i.test(m) ? '大きすぎる画像があります。もう少し小さい画像にしてください。'
+      : /quota|storage/i.test(m) ? '保存容量がいっぱいです。運営にお知らせください。'
+      : '投稿できませんでした。もう一度試してください。', true);
+  }finally{ $('submitPost').disabled = false; $('cancelPost').disabled = false; }
+});
+
+/* ---------- ログイン・登録 ---------- */
+function aStatus(msg, err){ $('aStatus').textContent = msg; $('aStatus').classList.toggle('err', !!err); }
+function openAuth(mode){
+  authMode = mode || 'in';
+  $('aTitle').textContent = {in:'ログイン', up:'新規登録', reset:'パスワードの再設定', newpass:'新しいパスワード'}[authMode];
+  $('aPenF').hidden = authMode !== 'up'; $('aAgree').hidden = authMode !== 'up';
+  $('aEmailF').hidden = authMode === 'newpass'; $('aPassF').hidden = authMode === 'reset';
+  $('aPass').autocomplete = authMode === 'in' ? 'current-password' : 'new-password';
+  $('aSubmit').textContent = {in:'ログイン', up:'登録する', reset:'再設定メールを送る', newpass:'変更する'}[authMode];
+  $('aSwitch').textContent = authMode === 'in' ? 'はじめての方は新規登録' : 'ログインはこちら';
+  $('aSwitch').hidden = authMode === 'newpass'; $('aForgot').hidden = authMode !== 'in';
+  aStatus(''); $('authSheet').hidden = false;
+}
+$('aSwitch').onclick = () => openAuth(authMode === 'in' ? 'up' : 'in');
+$('aForgot').onclick = () => openAuth('reset');
+$('aCancel').onclick = () => { $('authSheet').hidden = true; };
+$('authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('aEmail').value.trim(), password = $('aPass').value, pen = $('aPen').value.trim();
+  const back = location.origin + location.pathname;
+  $('aSubmit').disabled = true;
+  try{
+    if(authMode === 'in'){
+      const r = await sb.auth.signInWithPassword({email, password});
+      if(r.error) return aStatus(/confirm/i.test(r.error.message) ? '確認メールのリンクをまだ開いていません。' : 'メールアドレスかパスワードが違います。', true);
+      $('authSheet').hidden = true;
+    } else if(authMode === 'up'){
+      if(!pen) return aStatus('ペンネームを入れてください。', true);
+      if(!/^\S+@\S+\.\S+$/.test(email)) return aStatus('メールアドレスを確認してください。', true);
+      if(password.length < 8) return aStatus('パスワードは8文字以上にしてください。', true);
+      if(!$('aAgreeBox').checked) return aStatus('利用規約への同意が必要です。', true);
+      const r = await sb.auth.signUp({email, password, options: {data: {pen_name: pen}, emailRedirectTo: back}});
+      if(r.error) return aStatus('登録できませんでした。すでに登録済みのメールアドレスかもしれません。', true);
+      if(r.data.session) $('authSheet').hidden = true;
+      else aStatus('確認メールを送りました。メール内のリンクを開くと登録が完了します。');
+    } else if(authMode === 'reset'){
+      const r = await sb.auth.resetPasswordForEmail(email, {redirectTo: back});
+      aStatus(r.error ? '送信できませんでした。時間をおいて試してください。' : '再設定用のメールを送りました。', !!r.error);
+    } else {
+      if(password.length < 8) return aStatus('パスワードは8文字以上にしてください。', true);
+      const r = await sb.auth.updateUser({password});
+      if(r.error) return aStatus('変更できませんでした。もう一度試してください。', true);
+      $('authSheet').hidden = true; notice('パスワードを変更しました。');
+    }
+  }finally{ $('aSubmit').disabled = false; }
+});
+
+$('acctBtn').onclick = () => {
+  if(!sb) return;
+  if(!me) return openAuth('in');
+  $('acctMail').textContent = me.email || ''; $('acctPen').value = (profile && profile.pen_name) || '';
+  $('acctStatus').textContent = ''; $('acctSheet').hidden = false;
+};
+$('acctClose').onclick = () => { $('acctSheet').hidden = true; };
+$('acctOut').onclick = async () => { await sb.auth.signOut(); $('acctSheet').hidden = true; };
+$('acctForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pen = $('acctPen').value.trim();
+  const r = await sb.from('profiles').update({pen_name: pen}).eq('id', me.id);
+  if(r.error){ $('acctStatus').textContent = '保存できませんでした。'; return; }
+  if(profile) profile.pen_name = pen;
+  $('acctBtn').textContent = pen || 'アカウント'; $('acctSheet').hidden = true;
+});
+
+/* ---------- シェアされたリンク ---------- */
+async function readHash(){
+  const h = location.hash || ''; let m;
+  if((m = /^#shelf-([0-9a-f-]{36})$/.exec(h))){
+    const [b, p] = await Promise.all([
+      sb.from('bookmarks').select('work_id').eq('user_id', m[1]).order('created_at', {ascending:false}),
+      sb.from('profiles').select('shelf_name,pen_name').eq('id', m[1]).maybeSingle()
+    ]);
+    const pr = p.data || {};
+    shared = {ids: (b.data || []).map(r => r.work_id), name: pr.shelf_name || (pr.pen_name ? pr.pen_name + 'の本棚' : '')};
+    setView('shared');
+  } else if((m = /^#work-([0-9a-f-]{36})$/.exec(h))){
+    const w = works.find(x => x.id === m[1]);
+    if(w) openReader(w); else notice('この作品は見つかりませんでした。削除された可能性があります。');
+  }
+}
+window.addEventListener('hashchange', () => { if(sb) readHash(); });
+
+/* ---------- 起動 ---------- */
+if(!sb){
+  render();
+  notice('サイトの設定がまだ終わっていません（config.js にSupabaseの情報を入れてください）。', true);
+} else {
+  sb.auth.onAuthStateChange((ev, session) => {
+    me = session ? session.user : null;
+    if(ev === 'PASSWORD_RECOVERY') openAuth('newpass');
+    setTimeout(loadMine, 0);
+  });
+  loadWorks().then(readHash);
+}
+</script>
+</body>
+</html>
