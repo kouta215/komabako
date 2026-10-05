@@ -193,7 +193,7 @@ a{color:var(--accent)}
     <h3 id="aTitle">ログイン</h3>
     <p class="sub" id="aSub">投稿・いいね・本棚は、登録すると使えます。読むだけなら登録は不要です。</p>
     <div class="field" id="aPenF"><label for="aPen">ペンネーム</label><input type="text" id="aPen" maxlength="30" autocomplete="nickname"></div>
-    <div class="field" id="aEmailF"><label for="aEmail">メールアドレス</label><input type="email" id="aEmail" autocomplete="email"></div>
+    <div class="field" id="aEmailF"><label for="aEmail">ユーザーID（半角の英数字 4〜20文字）</label><input type="text" id="aEmail" maxlength="60" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="field" id="aPassF"><label for="aPass">パスワード（8文字以上）</label><input type="password" id="aPass" autocomplete="current-password"></div>
     <label class="check" id="aAgree"><input type="checkbox" id="aAgreeBox"><span><a href="terms.html" target="_blank">利用規約</a>と<a href="privacy.html" target="_blank">プライバシーポリシー</a>に同意します</span></label>
     <div class="row">
@@ -575,6 +575,7 @@ $('postForm').addEventListener('submit', async e => {
 });
 
 /* ---------- ログイン・登録 ---------- */
+const ID_DOMAIN = '@komabako.vercel.app';
 function aStatus(msg, err){ $('aStatus').textContent = msg; $('aStatus').classList.toggle('err', !!err); }
 function openAuth(mode){
   authMode = mode || 'in';
@@ -584,7 +585,8 @@ function openAuth(mode){
   $('aPass').autocomplete = authMode === 'in' ? 'current-password' : 'new-password';
   $('aSubmit').textContent = {in:'ログイン', up:'登録する', reset:'再設定メールを送る', newpass:'変更する'}[authMode];
   $('aSwitch').textContent = authMode === 'in' ? 'はじめての方は新規登録' : 'ログインはこちら';
-  $('aSwitch').hidden = authMode === 'newpass'; $('aForgot').hidden = authMode !== 'in';
+  $('aSwitch').hidden = authMode === 'newpass'; $('aForgot').hidden = true;
+  $('aSub').textContent = authMode === 'up' ? 'メールアドレスは不要です。パスワードを忘れると再設定できないので、必ず控えておいてください。' : '投稿・いいね・本棚は、登録すると使えます。読むだけなら登録は不要です。';
   aStatus(''); $('authSheet').hidden = false;
 }
 $('aSwitch').onclick = () => openAuth(authMode === 'in' ? 'up' : 'in');
@@ -592,32 +594,32 @@ $('aForgot').onclick = () => openAuth('reset');
 $('aCancel').onclick = () => { $('authSheet').hidden = true; };
 $('authForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const email = $('aEmail').value.trim(), password = $('aPass').value, pen = $('aPen').value.trim();
+  const uid = $('aEmail').value.trim().toLowerCase(), email = uid.includes('@') ? uid : uid + ID_DOMAIN, password = $('aPass').value, pen = $('aPen').value.trim();
   const back = location.origin + location.pathname;
   $('aSubmit').disabled = true;
   try{
     if(authMode === 'in'){
       const r = await sb.auth.signInWithPassword({email, password});
-      if(r.error) return aStatus(/confirm/i.test(r.error.message) ? '確認メールのリンクをまだ開いていません。' : 'メールアドレスかパスワードが違います。', true);
+      if(r.error) return aStatus('ユーザーIDかパスワードが違います。', true);
       $('authSheet').hidden = true;
     } else if(authMode === 'up'){
       if(!pen) return aStatus('ペンネームを入れてください。', true);
-      if(!/^\S+@\S+\.\S+$/.test(email)) return aStatus('メールアドレスを確認してください。', true);
+      if(!/^[a-z0-9_]{4,20}$/.test(uid)) return aStatus('ユーザーIDは半角の英数字と _ で、4〜20文字にしてください。', true);
       if(password.length < 8) return aStatus('パスワードは8文字以上にしてください。', true);
       if(!$('aAgreeBox').checked) return aStatus('利用規約への同意が必要です。', true);
       const r = await sb.auth.signUp({email, password, options: {data: {pen_name: pen}, emailRedirectTo: back}});
       if(r.error){
         const m = String(r.error.message || '');
-        return aStatus((/already|registered|exists/i.test(m) ? 'このメールアドレスはすでに登録されています。ログインしてください。'
-          : /rate limit|too many|seconds/i.test(m) ? '確認メールの送信上限に達しました。しばらく待ってから試してください。'
-          : /invalid/i.test(m) ? 'このメールアドレスは使えません。ふだん使っている実在のアドレスで試してください。'
+        return aStatus((/already|registered|exists/i.test(m) ? 'このユーザーIDはすでに使われています。別のIDにしてください。'
+          : /rate limit|too many|seconds/i.test(m) ? '登録が混み合っています。しばらく待ってから試してください。'
+          : /invalid/i.test(m) ? 'このユーザーIDは使えません。別のIDで試してください。'
           : /password/i.test(m) ? 'このパスワードは使えません。もっと長く、推測されにくいものにしてください。'
           : /signups? (not allowed|disabled)/i.test(m) ? '現在、新規登録を受け付けていません。'
           : /database error/i.test(m) ? 'サーバー側の設定に問題があり、登録できませんでした。'
           : '登録できませんでした。') + '（' + m + '）', true);
       }
       if(r.data.session) $('authSheet').hidden = true;
-      else aStatus('確認メールを送りました。メール内のリンクを開くと登録が完了します。');
+      else aStatus('登録を完了できませんでした。運営の設定（メール確認）がオンのままです。', true);
     } else if(authMode === 'reset'){
       const r = await sb.auth.resetPasswordForEmail(email, {redirectTo: back});
       aStatus(r.error ? '送信できませんでした。時間をおいて試してください。' : '再設定用のメールを送りました。', !!r.error);
@@ -633,7 +635,7 @@ $('authForm').addEventListener('submit', async e => {
 $('acctBtn').onclick = () => {
   if(!sb) return;
   if(!me) return openAuth('in');
-  $('acctMail').textContent = me.email || ''; $('acctPen').value = (profile && profile.pen_name) || '';
+  $('acctMail').textContent = 'ユーザーID：' + String(me.email || '').replace(ID_DOMAIN, ''); $('acctPen').value = (profile && profile.pen_name) || '';
   $('acctStatus').textContent = ''; $('acctSheet').hidden = false;
 };
 $('acctClose').onclick = () => { $('acctSheet').hidden = true; };
