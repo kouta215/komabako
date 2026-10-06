@@ -138,6 +138,9 @@ a{color:var(--accent)}
 .link{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font-size:13px}
 .field input[type=email],.field input[type=password]{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--paper)}
 .rbot{flex-wrap:wrap}
+.eps{display:flex;gap:6px;overflow-x:auto;max-width:720px;margin:0 auto;padding:0 16px 14px}
+.eps button{flex:none}
+.finacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
 .rtop{flex-wrap:wrap}
 .rtop .t{flex:1 1 140px}
 </style>
@@ -223,11 +226,12 @@ a{color:var(--accent)}
 <!-- 投稿パネル -->
 <div class="sheet" id="postSheet" hidden>
   <form class="panel" id="postForm" novalidate>
-    <h3>漫画を投稿</h3>
+    <h3 id="pTitle">漫画を投稿</h3>
     <p class="sub">画像はファイル名の順（01.jpg, 02.jpg…）に上から縦につながります。1枚目が表紙になります。縦長の画像もそのまま使えます。</p>
-    <div class="field"><label for="fTitle">タイトル</label><input type="text" id="fTitle" maxlength="60" required placeholder="例：放課後ロケット部"></div>
-    <div class="field"><label for="fAuthor">ペンネーム</label><input type="text" id="fAuthor" maxlength="30" required placeholder="例：みなと"></div>
-    <div class="field"><label for="fDesc">ひとこと紹介（任意）</label><textarea id="fDesc" maxlength="200" placeholder="どんな話か一行で"></textarea></div>
+    <div class="field" id="fTitleF"><label for="fTitle">タイトル</label><input type="text" id="fTitle" maxlength="60" required placeholder="例：放課後ロケット部"></div>
+    <div class="field" id="fAuthorF"><label for="fAuthor">ペンネーム</label><input type="text" id="fAuthor" maxlength="30" required placeholder="例：みなと"></div>
+    <div class="field" id="fDescF"><label for="fDesc">ひとこと紹介（任意）</label><textarea id="fDesc" maxlength="200" placeholder="どんな話か一行で"></textarea></div>
+    <div class="field" id="fEpF" hidden><label for="fEp">サブタイトル（任意）</label><input type="text" id="fEp" maxlength="60" placeholder="例：はじめての打ち上げ"></div>
     <div class="field">
       <label for="fFiles">ページ画像（最大60枚）</label>
       <label class="drop" id="drop" for="fFiles">クリックして画像を選ぶ<br>またはここにドラッグ</label>
@@ -268,8 +272,11 @@ a{color:var(--accent)}
   <div class="stage" id="stage">
     <p class="desc" id="rDesc"></p>
     <p class="desc" id="rReports" hidden></p>
+    <div class="eps" id="rEps" hidden></div>
     <div class="strip" id="strip"></div>
-    <div class="fin"><b>おわり</b><span id="rFin"></span></div>
+    <div class="fin"><b id="rFinB">おわり</b><span id="rFin"></span>
+      <div class="finacts"><button class="rbtn on" id="rNextEp" hidden>次の話へ →</button><button class="rbtn" id="rAddEp" hidden>＋ 続きを投稿</button></div>
+    </div>
   </div>
   <div class="prog"><i id="rBar"></i></div>
   <div class="rbot">
@@ -290,6 +297,7 @@ const cfgOk = typeof cfg.url === 'string' && cfg.url.startsWith('https://') && t
 const sb = cfgOk ? supabase.createClient(cfg.url, cfg.key) : null;
 
 let me = null, profile = null, works = [], myLikes = new Set(), myShelf = [], shared = null, reports = {};
+let eps = [], epIdx = 0, postParent = null, postEpNo = 2, postEpLabel = 2;
 let view = 'new', current = null, page = 0, picked = [], pageObs = null, authMode = 'in', noticeTimer = null;
 const TITLES = {new:'新着の作品', likes:'いいね数ランキング', shelf:'ブックマーク数ランキング', views:'閲覧数ランキング', mine:'わたしの本棚', shared:'シェアされた本棚', reports:'通報された作品'};
 
@@ -308,7 +316,7 @@ async function copyText(text, okMsg){
 async function loadWorks(){
   const {data, error} = await sb.from('work_list').select('*').order('created_at', {ascending:false}).limit(500);
   if(error){ works = []; notice('作品を読み込めませんでした。時間をおいて開き直してください。', true); }
-  else works = data || [];
+  else works = (data || []).sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
   render();
 }
 async function loadMine(){
@@ -375,12 +383,12 @@ function render(){
     const b = document.createElement('button'); b.className = 'work'; b.type = 'button';
     const c = document.createElement('div'); c.className = 'cover';
     const img = document.createElement('img'); img.loading = 'lazy'; img.alt = w.title + ' の表紙'; img.src = imgUrl(w.pages[0]);
-    const pg = document.createElement('span'); pg.className = 'pages'; pg.textContent = w.pages.length + 'P';
+    const pg = document.createElement('span'); pg.className = 'pages'; pg.textContent = w.episode_count > 1 ? '全' + w.episode_count + '話' : w.pages.length + 'P';
     c.append(img, pg);
     if(ranked){ const r = document.createElement('span'); r.className = 'rank' + (i < 3 ? ' top' : ''); r.textContent = i + 1; c.append(r); }
     if(reports[w.id]){ const f = document.createElement('span'); f.className = 'flag'; f.textContent = '通報 ' + reports[w.id].length; c.append(f); }
     const t = document.createElement('p'); t.className = 'wt'; t.textContent = w.title;
-    const a = document.createElement('p'); a.className = 'wa'; a.textContent = w.author + '・' + fmtDate(w.created_at);
+    const a = document.createElement('p'); a.className = 'wa'; a.textContent = w.author + '・' + fmtDate(w.updated_at || w.created_at);
     const st = document.createElement('p'); st.className = 'stats';
     [['♥', 'like_count', 'likes'], ['本棚', 'shelf_count', 'shelf'], ['閲覧', 'view_count', 'views']].forEach(([label, k, v]) => {
       const sp = document.createElement(view === v ? 'b' : 'span'); sp.textContent = label + ' ' + (w[k] || 0); st.append(sp);
@@ -416,35 +424,57 @@ function countView(w){
   seen.push(key); try{ localStorage.setItem('kb_seen', JSON.stringify(seen.slice(-2000))); }catch(e){}
   sb.from('views').insert({work_id: w.id, viewer: me ? me.id : deviceId()}).then(r => { if(!r.error){ w.view_count = (w.view_count || 0) + 1; render(); } });
 }
-function openReader(w){
-  current = w; page = 0;
-  $('rTitle').textContent = w.title; $('rAuthor').textContent = w.author + '・' + w.pages.length + 'ページ';
-  $('rDesc').textContent = w.description || ''; $('rDesc').hidden = !w.description;
-  $('rReports').hidden = !reports[w.id];
-  if(reports[w.id]) $('rReports').textContent = '通報 ' + reports[w.id].length + '件：' + [...new Set(reports[w.id])].join('、');
-  $('rFin').textContent = w.author + '「' + w.title + '」';
-  $('rDelete').hidden = !(me && (w.user_id === me.id || isAdmin()));
-  $('reportBox').hidden = true; $('deleteBox').hidden = true; $('rReport').textContent = '通報'; $('rShare').textContent = 'シェア';
+function epLabel(e, i){ return '第' + (i + 1) + '話' + (e.episode_title ? '　' + e.episode_title : ''); }
+function showEpisode(i){
+  if(!current) return;
+  epIdx = Math.max(0, Math.min(i, eps.length - 1)); page = 0;
+  const w = current, e = eps[epIdx], multi = eps.length > 1, last = epIdx >= eps.length - 1;
+  $('rTitle').textContent = w.title + (multi ? '　' + epLabel(e, epIdx) : '');
+  $('rAuthor').textContent = w.author + '・' + (multi ? '全' + eps.length + '話・' : '') + e.pages.length + 'ページ';
+  const box = $('rEps'); box.textContent = ''; box.hidden = !multi;
+  if(multi) eps.forEach((x, k) => {
+    const b = document.createElement('button'); b.className = 'rbtn' + (k === epIdx ? ' on' : '');
+    b.textContent = (k + 1) + '話'; b.title = epLabel(x, k); b.onclick = () => showEpisode(k); box.append(b);
+  });
+  $('rFinB').textContent = last ? 'おわり' : 'つづく';
+  $('rFin').textContent = w.author + '「' + w.title + '」' + (multi ? ' ' + epLabel(e, epIdx) : '');
+  $('rNextEp').hidden = last;
+  $('rAddEp').hidden = !(me && w.user_id === me.id);
+  $('rAddEp').textContent = '＋ 続きを投稿（第' + (eps.length + 1) + '話）';
+  $('reportBox').hidden = true; $('deleteBox').hidden = true;
   const strip = $('strip'); strip.textContent = '';
   if(pageObs) pageObs.disconnect();
   pageObs = new IntersectionObserver(es => {
-    es.forEach(e => { if(e.isIntersecting){ page = +e.target.dataset.i; updateProgress(); } });
+    es.forEach(en => { if(en.isIntersecting){ page = +en.target.dataset.i; updateProgress(); } });
   }, {root: $('stage'), rootMargin: '-45% 0px -45% 0px'});
-  w.pages.forEach((p, i) => {
+  e.pages.forEach((p, k) => {
     const im = document.createElement('img');
-    im.src = imgUrl(p); im.alt = w.title + ' ' + (i + 1) + 'ページ'; im.dataset.i = i;
-    if(i > 2) im.loading = 'lazy';
+    im.src = imgUrl(p); im.alt = w.title + ' ' + (k + 1) + 'ページ'; im.dataset.i = k;
+    if(k > 2) im.loading = 'lazy';
     strip.append(im); pageObs.observe(im);
   });
+  $('stage').scrollTop = 0; updateProgress();
+}
+async function openReader(w){
+  current = w; eps = [w]; epIdx = 0;
+  $('rDesc').textContent = w.description || ''; $('rDesc').hidden = !w.description;
+  $('rReports').hidden = !reports[w.id];
+  if(reports[w.id]) $('rReports').textContent = '通報 ' + reports[w.id].length + '件：' + [...new Set(reports[w.id])].join('、');
+  $('rDelete').hidden = !(me && (w.user_id === me.id || isAdmin()));
+  $('rReport').textContent = '通報'; $('rShare').textContent = 'シェア';
   countView(w); syncReaderBtns();
   document.body.style.overflow = 'hidden';
-  $('reader').hidden = false; $('stage').scrollTop = 0; updateProgress(); $('rClose').focus();
+  $('reader').hidden = false; showEpisode(0); $('rClose').focus();
+  if((w.episode_count || 1) > 1){
+    const r = await sb.from('works').select('id,user_id,pages,episode_no,episode_title,created_at').eq('parent_id', w.id).order('episode_no');
+    if(current === w && !r.error && r.data && r.data.length){ eps = [w, ...r.data]; showEpisode(epIdx); }
+  }
 }
 function updateProgress(){
   if(!current) return;
   const st = $('stage'), max = st.scrollHeight - st.clientHeight;
   $('rBar').style.width = (max > 0 ? Math.min(100, st.scrollTop / max * 100) : 0) + '%';
-  $('rPg').textContent = (page + 1) + ' / ' + current.pages.length + ' ページ';
+  $('rPg').textContent = (page + 1) + ' / ' + (eps[epIdx] || current).pages.length + ' ページ';
 }
 function closeReader(){
   $('reader').hidden = true; current = null; document.body.style.overflow = '';
@@ -460,6 +490,13 @@ function syncReaderBtns(){
 $('stage').addEventListener('scroll', updateProgress, {passive: true});
 $('rTop').onclick = () => $('stage').scrollTo({top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
 $('rClose').onclick = closeReader;
+$('rNextEp').onclick = () => showEpisode(epIdx + 1);
+$('rAddEp').onclick = () => {
+  if(!current) return;
+  postParent = current; postEpLabel = eps.length + 1;
+  postEpNo = Math.max(1, ...eps.slice(1).map(e => e.episode_no || 1)) + 1;
+  closeReader(); setPostMode(); $('postSheet').hidden = false; $('fEp').focus();
+};
 document.addEventListener('keydown', e => { if(!$('reader').hidden && e.key === 'Escape') closeReader(); });
 
 async function toggle(table, w, has, add, remove, countKey){
@@ -489,18 +526,38 @@ $('rReportSend').onclick = async () => {
   $('reportBox').hidden = true; $('rReport').textContent = r.error ? '通報できませんでした' : '通報しました';
   $('rReportSend').disabled = false;
 };
-$('rDelete').onclick = () => { $('reportBox').hidden = true; $('delMsg').textContent = 'この作品と全ページの画像を削除します。元に戻せません。'; $('deleteBox').hidden = !$('deleteBox').hidden; };
+$('rDelete').onclick = () => {
+  $('reportBox').hidden = true;
+  $('delMsg').textContent = epIdx > 0 ? '第' + (epIdx + 1) + '話だけを削除します。元に戻せません。'
+    : eps.length > 1 ? 'この作品を全' + eps.length + '話まとめて削除します。元に戻せません。'
+    : 'この作品と全ページの画像を削除します。元に戻せません。';
+  $('deleteBox').hidden = !$('deleteBox').hidden;
+};
 $('rDelCancel').onclick = () => { $('deleteBox').hidden = true; };
 $('rDelOk').onclick = async () => {
-  const w = current; if(!w) return;
+  const w = current, i = epIdx; if(!w) return;
   $('rDelOk').disabled = true;
-  const r = await sb.from('works').delete().eq('id', w.id);
-  if(r.error){ $('delMsg').textContent = '削除できませんでした。時間をおいてもう一度試してください。'; }
-  else {
-    await sb.storage.from('pages').remove(w.pages);
-    works = works.filter(x => x.id !== w.id); delete reports[w.id]; myShelf = myShelf.filter(id => id !== w.id);
-    closeReader(); render();
-  }
+  try{
+    if(i > 0){
+      const e = eps[i];
+      const r = await sb.from('works').delete().eq('id', e.id);
+      if(r.error) throw r.error;
+      await sb.storage.from('pages').remove(e.pages);
+      eps.splice(i, 1); w.episode_count = eps.length;
+      $('deleteBox').hidden = true; showEpisode(Math.min(i, eps.length - 1)); render();
+    } else {
+      const all = [...w.pages];
+      if((w.episode_count || 1) > 1){
+        const c = await sb.from('works').select('pages').eq('parent_id', w.id);
+        (c.data || []).forEach(x => all.push(...x.pages));
+      }
+      const r = await sb.from('works').delete().eq('id', w.id);
+      if(r.error) throw r.error;
+      for(let k = 0; k < all.length; k += 100) await sb.storage.from('pages').remove(all.slice(k, k + 100));
+      works = works.filter(x => x.id !== w.id); delete reports[w.id]; myShelf = myShelf.filter(id => id !== w.id);
+      closeReader(); render();
+    }
+  }catch(err){ $('delMsg').textContent = '削除できませんでした。時間をおいてもう一度試してください。'; }
   $('rDelOk').disabled = false;
 };
 
@@ -534,16 +591,24 @@ async function shrink(file){
   if(!blob) throw new Error('encode');
   return blob;
 }
+function setPostMode(){
+  const ep = !!postParent;
+  $('pTitle').textContent = ep ? '「' + postParent.title + '」第' + postEpLabel + '話を投稿' : '漫画を投稿';
+  $('fTitleF').hidden = $('fAuthorF').hidden = $('fDescF').hidden = ep; $('fEpF').hidden = !ep;
+  setStatus('');
+}
 $('openPost').onclick = () => {
   if(!sb) return;
   if(!me) return openAuth('in');
+  postParent = null; setPostMode();
   if(!$('fAuthor').value && profile) $('fAuthor').value = profile.pen_name || '';
   $('postSheet').hidden = false; $('fTitle').focus();
 };
 $('cancelPost').onclick = () => { $('postSheet').hidden = true; };
 $('postForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const title = $('fTitle').value.trim(), author = $('fAuthor').value.trim(), description = $('fDesc').value.trim();
+  const P = postParent;
+  const title = P ? P.title : $('fTitle').value.trim(), author = P ? P.author : $('fAuthor').value.trim(), description = P ? '' : $('fDesc').value.trim();
   if(!me) return setStatus('ログインしてください', true);
   if(!title) return setStatus('タイトルを入れてください', true);
   if(!author) return setStatus('ペンネームを入れてください', true);
@@ -561,10 +626,13 @@ $('postForm').addEventListener('submit', async e => {
       paths.push(path);
     }
     setStatus('保存しています…');
-    const ins = await sb.from('works').insert({id, user_id: me.id, title, author, description, pages: paths});
+    const row = {id, user_id: me.id, title, author, description, pages: paths};
+    if(P) Object.assign(row, {parent_id: P.id, episode_no: postEpNo, episode_title: $('fEp').value.trim()});
+    const ins = await sb.from('works').insert(row);
     if(ins.error) throw ins.error;
     $('postForm').reset(); pick([]); $('postSheet').hidden = true; setStatus('');
     setView('new'); await loadWorks();
+    if(P){ const w = works.find(x => x.id === P.id); if(w){ await openReader(w); showEpisode(eps.length - 1); } }
   }catch(err){
     if(paths.length) await sb.storage.from('pages').remove(paths);
     const m = String((err && err.message) || '');
